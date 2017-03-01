@@ -30,6 +30,9 @@ import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,12 +52,24 @@ public class MainActivity extends AppCompatActivity {
 
     private String mUsername;
 
+    /** The access point to the Firebase Realtime Database. */
+    private FirebaseDatabase mFirebaseDatabase;
+
+    /** A reference to the messages portion of the database. */
+    private DatabaseReference mMessagesDatabaseReference;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
         mUsername = ANONYMOUS;
+
+        // Initialize the Firebase components
+        // Get an access point to the Firebase Realtime Database
+        mFirebaseDatabase = FirebaseDatabase.getInstance();
+        // Get reference to a portion of the database called "messages"
+        mMessagesDatabaseReference = mFirebaseDatabase.getReference().child("messages");
 
         // Initialize references to views
         mProgressBar = (ProgressBar) findViewById(R.id.progressBar);
@@ -104,7 +119,13 @@ public class MainActivity extends AppCompatActivity {
         mSendButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                // TODO: Send messages on click
+                // Create a new FriendlyMessage holding the text in the EditText, the current
+                // username and the photo URL
+                FriendlyMessage friendlyMessage =
+                        new FriendlyMessage(mMessageEditText.getText().toString(), mUsername, null);
+                // Creates an auto-generated child location of messages, along with a key. Then we
+                // attempt to add the FriendlyMessage as the value for this key in the database.
+                mMessagesDatabaseReference.push().setValue(friendlyMessage);
 
                 // Clear input box
                 mMessageEditText.setText("");
