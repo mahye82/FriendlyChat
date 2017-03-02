@@ -2,6 +2,7 @@ apply plugin: 'com.android.application'
 
 repositories {
     mavenLocal()
+    maven { url 'https://maven.fabric.io/public' }
     flatDir {
         dirs 'libs'
     }
@@ -43,5 +44,12 @@ dependencies {
 
     // Firebase Realtime Database
     compile 'com.google.firebase:firebase-database:10.2.0'
+
+    // Firebase Authentication
+    compile 'com.google.firebase:firebase-auth:10.2.0'
+
+    // Firebase UI Auth. For more info, see:
+    // https://github.com/firebase/FirebaseUI-Android/tree/master/auth
+    compile 'com.firebaseui:firebase-ui-auth:1.2.0'
 }
 apply plugin: 'com.google.gms.google-services'
