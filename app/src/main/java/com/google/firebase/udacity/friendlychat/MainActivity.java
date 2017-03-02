@@ -30,7 +30,6 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
-import android.widget.Toast;
 
 import com.firebase.ui.auth.AuthUI;
 import com.google.firebase.auth.FirebaseAuth;
@@ -170,45 +169,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Define the behaviour for the listener which will be attached to the "messages"
-        // DatabaseReference
-        mChildEventListener = new ChildEventListener() {
-            @Override
-            public void onChildAdded(DataSnapshot dataSnapshot, String s) {
-                // The value we get from DataSnapshot is an object holding the message from the
-                // database.
-                //
-                // We can deserialize it to a FriendlyMessage object because the class
-                // has the exact same fields found in the object returned from the database.
-                FriendlyMessage friendlyMessage = dataSnapshot.getValue(FriendlyMessage.class);
-
-                // Add the FriendlyMessage to the adapter to be displayed.
-                mMessageAdapter.add(friendlyMessage);
-            }
-
-            @Override
-            public void onChildChanged(DataSnapshot dataSnapshot, String s) {
-
-            }
-
-            @Override
-            public void onChildRemoved(DataSnapshot dataSnapshot) {
-
-            }
-
-            @Override
-            public void onChildMoved(DataSnapshot dataSnapshot, String s) {
-
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-
-            }
-        };
-
-        mMessagesDatabaseReference.addChildEventListener(mChildEventListener);
-
         // Create a listener to handle changes to the authentication state. The listener is attached
         // in onResume() and detached in onPause().
         mAuthStateListener = new FirebaseAuth.AuthStateListener() {
@@ -217,13 +177,12 @@ public class MainActivity extends AppCompatActivity {
                 FirebaseUser user = firebaseAuth.getCurrentUser();
                 if (user != null) {
                     // User is signed in
-                    Toast.makeText(
-                            MainActivity.this,
-                            "You're now signed in. Welcome to FriendlyChat.",
-                            Toast.LENGTH_SHORT)
-                            .show();
+
+                    onSignedInInitialize(user.getDisplayName());
                 } else {
                     // User is signed out
+
+                    onSignedOutCleanup();
 
                     // Create a list of authentication providers that we want FirebaseUI to handle
                     // the sign-in flow
@@ -262,12 +221,108 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // We need to be listening for changes in the sign-in state when the Activity is resumed
         mFirebaseAuth.addAuthStateListener(mAuthStateListener);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        mFirebaseAuth.removeAuthStateListener(mAuthStateListener);
+        // We don't need to be listening for changes in the sign-in state when the Activity is
+        // paused
+        if (mAuthStateListener != null) {
+            mFirebaseAuth.removeAuthStateListener(mAuthStateListener);
+        }
+
+        // Needs to be added here, so that when an Activity is destroyed in a way that has nothing
+        // to do with signing-out, such as an app-rotation, the listener and adapter are cleaned up.
+        mMessageAdapter.clear();
+        detachDatabaseReadListener();
+    }
+
+    /**
+     * Changes the display name in all sent messages to that of the newly signed-in user. Attaches
+     * the listener reading messages from the Firebase Realtime Database.
+     */
+    private void onSignedInInitialize(String displayName) {
+        // Ensures that all new messages sent attach the signed-in user's display name
+        mUsername = displayName;
+        // We should only start reading messages when signed-in
+        attachDatabaseReadListener();
+    }
+
+    /**
+     * Clears all messages currently displayed on screen, and detaches the listener reading messages
+     * from the Firebase Realtime Database. Clears the name being used for sent messages and sets
+     * it to ANONYMOUS.
+     */
+    private void onSignedOutCleanup() {
+        // The user is no longer signed-in, so the name should be removed from the field storing
+        // the
+        mUsername = ANONYMOUS;
+
+        // User who isn't signed in shouldn't see messages. No need to be reading messages when
+        // signed in either.
+        mMessageAdapter.clear();
+        detachDatabaseReadListener();
+    }
+
+    /**
+     * Creates and attaches a listener to the "messages" portion of the Firebase Realtime Database,
+     * if one doesn't already exist.
+     */
+    private void attachDatabaseReadListener() {
+        // If there's already a listener reading the database at child "messages", we don't need to
+        // continue. We only need one listener at a time. Finish early.
+        if (mChildEventListener != null) {
+            return;
+        }
+
+        // Define the behaviour for the listener which will be attached to the "messages"
+        // DatabaseReference
+        mChildEventListener = new ChildEventListener() {
+            @Override
+            public void onChildAdded(DataSnapshot dataSnapshot, String s) {
+                // The value we get from DataSnapshot is an object holding the message from the
+                // database.
+                //
+                // We can deserialize it to a FriendlyMessage object because the class
+                // has the exact same fields found in the object returned from the database.
+                FriendlyMessage friendlyMessage = dataSnapshot.getValue(FriendlyMessage.class);
+
+                // Add the FriendlyMessage to the adapter to be displayed.
+                mMessageAdapter.add(friendlyMessage);
+            }
+
+            @Override
+            public void onChildChanged(DataSnapshot dataSnapshot, String s) {}
+
+            @Override
+            public void onChildRemoved(DataSnapshot dataSnapshot) {}
+
+            @Override
+            public void onChildMoved(DataSnapshot dataSnapshot, String s) {}
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {}
+        };
+
+        mMessagesDatabaseReference.addChildEventListener(mChildEventListener);
+    }
+
+    /**
+     * Detaches the listener attached to the "messages" node of the Firebase Realtime Database, if
+     * one exists.
+     */
+    private void detachDatabaseReadListener() {
+        // If there's no listener reading the database at child "messages", we don't need to
+        // continue. Finish early.
+        if (mChildEventListener == null) {
+            return;
+        }
+
+        // Remove the listener reading the database at child "messages"
+        mMessagesDatabaseReference.removeEventListener(mChildEventListener);
+        mChildEventListener = null;
     }
 }
