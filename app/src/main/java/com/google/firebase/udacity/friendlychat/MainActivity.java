@@ -15,6 +15,7 @@
  */
 package com.google.firebase.udacity.friendlychat;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
@@ -30,6 +31,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
+import android.widget.Toast;
 
 import com.firebase.ui.auth.AuthUI;
 import com.google.firebase.auth.FirebaseAuth;
@@ -216,6 +218,27 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        // onActivityResult() is called BEFORE onResume(), so this will run before onResume()
+        // attempts to add the AuthStateListener, which triggers a FirebaseUI sign-in screen.
+
+        // If the user pressed the back button, we'll get RESULT_CANCELED. To prevent an endless
+        // loop where onResume() just creates the sign-in screen again, we finish the Activity.
+        if (requestCode == RC_SIGN_IN) {
+            switch (resultCode) {
+                case RESULT_OK:
+                    Toast.makeText(this, "Signed in!", Toast.LENGTH_SHORT).show();
+                    break;
+                case RESULT_CANCELED:
+                    Toast.makeText(this, "Sign-in canceled", Toast.LENGTH_SHORT).show();
+                    finish();
+            }
+        }
     }
 
     @Override
