@@ -16,6 +16,7 @@
 package com.google.firebase.udacity.friendlychat;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
@@ -34,6 +35,7 @@ import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.firebase.ui.auth.AuthUI;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.ChildEventListener;
@@ -41,6 +43,9 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -82,7 +87,7 @@ public class MainActivity extends AppCompatActivity {
     private FirebaseDatabase mFirebaseDatabase;
 
     /**
-     * A reference to the messages portion of the database.
+     * A reference to the "messages" portion of the database.
      */
     private DatabaseReference mMessagesDatabaseReference;
 
@@ -91,6 +96,16 @@ public class MainActivity extends AppCompatActivity {
      */
     private FirebaseAuth mFirebaseAuth;
     private FirebaseAuth.AuthStateListener mAuthStateListener;
+
+    /**
+     * The entry point for all Firebase Storage actions.
+     */
+    private FirebaseStorage mFirebaseStorage;
+
+    /**
+     * A reference to the "chat_photos" portion of the storage.
+     */
+    private StorageReference mChatPhotosStorageReference;
 
     /**
      * A listener that will handle the callback behaviour when the children of any DatabaseReference
@@ -114,8 +129,14 @@ public class MainActivity extends AppCompatActivity {
         // Get an entry point to all Firebase Authentication actions
         mFirebaseAuth = FirebaseAuth.getInstance();
 
+        // Get an entry point to all Firebase Storage actions
+        mFirebaseStorage = FirebaseStorage.getInstance();
+
         // Get reference to a portion of the database called "messages"
         mMessagesDatabaseReference = mFirebaseDatabase.getReference().child("messages");
+
+        // Get reference to a portion of the storage called "chat_photos"
+        mChatPhotosStorageReference = mFirebaseStorage.getReference().child("chat_photos");
 
         // Initialize references to views
         mProgressBar = (ProgressBar) findViewById(R.id.progressBar);
@@ -255,6 +276,45 @@ public class MainActivity extends AppCompatActivity {
                 case RESULT_CANCELED:
                     Toast.makeText(this, "Sign-in canceled", Toast.LENGTH_SHORT).show();
                     finish();
+            }
+        } else if (requestCode == RC_PHOTO_PICKER) {
+            // Handling the result of the photo picker
+
+            switch (resultCode) {
+                case RESULT_OK:
+                    // Get the URI of the selected image on the device
+                    Uri selectedImageUri = data.getData();
+
+                    // Get a reference to the "chat_photos" section of the Firebase Storage, then
+                    // make a child which will be named after the last path segment of the URI.
+                    // For example, if we have a URI like content://local_images/foo/4, the last
+                    // path segment will be 4. This will be the filename we'll be saving our image
+                    // as at this reference in the storage.
+                    StorageReference photoRef =
+                            mChatPhotosStorageReference.child(selectedImageUri.getLastPathSegment());
+
+                    // Asynchronously attempt to upload the file at the URI on the device to the
+                    // StorageReference we just defined
+                    UploadTask uploadTask = photoRef.putFile(selectedImageUri);
+
+                    // Register observers to listen for when the download is done
+                    uploadTask.addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                        @Override
+                        public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                            // When the image has successfully uploaded, get its download URL in the
+                            // Firebase Storage
+                            @SuppressWarnings("VisibleForTests") Uri downloadUrl =
+                                    taskSnapshot.getDownloadUrl();
+
+                            // Add the download URL in the Firebase Storage to the FriendlyMessage
+                            // that we'll store in the database
+                            if (downloadUrl != null) {
+                                FriendlyMessage friendlyMessage =
+                                        new FriendlyMessage(null, mUsername, downloadUrl.toString());
+                                mMessagesDatabaseReference.push().setValue(friendlyMessage);
+                            }
+                        }
+                    });
             }
         }
     }
