@@ -58,5 +58,8 @@ dependencies {
 
     // Firebase Storage
     compile 'com.google.firebase:firebase-storage:10.2.0'
+
+    // Firebase Cloud Messaging & Notifications
+    compile 'com.google.firebase:firebase-messaging:10.2.0'
 }
 apply plugin: 'com.google.gms.google-services'
