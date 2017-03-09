@@ -23,6 +23,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -35,6 +36,7 @@ import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.firebase.ui.auth.AuthUI;
+import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -276,6 +278,8 @@ public class MainActivity extends AppCompatActivity {
         Map<String, Object> defaultConfigMap = new HashMap<>();
         defaultConfigMap.put(FRIENDLY_MSG_LENGTH_KEY, DEFAULT_MSG_LENGTH_LIMIT);
         mFirebaseRemoteConfig.setDefaults(defaultConfigMap);
+
+        fetchConfig();
     }
 
     @Override
@@ -463,5 +467,79 @@ public class MainActivity extends AppCompatActivity {
         // Remove the listener reading the database at child "messages"
         mMessagesDatabaseReference.removeEventListener(mChildEventListener);
         mChildEventListener = null;
+    }
+
+    /**
+     * Fetches the parameter values for the app from the Firebase project, as they were entered
+     * into the Firebase Console. Handles both successful and failed fetch cases. Applies the
+     * fetched parameter values (if any) to the app.
+     */
+    private void fetchConfig() {
+        // If developer mode is enabled, we should reduce cacheExpiration to 0 so that each fetch
+        // goes to the server immediately. This should not be used in release builds - production
+        // builds should have a cache expiration of 1 hour. Fetching configs from the server is
+        // normally limited to 5 requests per hour, thus we need to be careful about how many
+        // configs we do in release builds. Developer mode allows many more configs, thus we can
+        // fetch immediately.
+        long cacheExpiration = 3600; // 1 hour in seconds
+        boolean developerMode = mFirebaseRemoteConfig
+                .getInfo()
+                .getConfigSettings()
+                .isDeveloperModeEnabled();
+
+        if (developerMode) {
+            cacheExpiration = 0;
+        }
+
+        // Attempt to fetch parameter values from the Firebase server. If the data in the cache was
+        // last fetched more than 'cacheExpiration' seconds ago, a fetch from the Remote Config
+        // Server will be attempted. Otherwise, this method will return the cached data.
+        mFirebaseRemoteConfig.fetch(cacheExpiration)
+                // If the fetch succeeded,
+                .addOnSuccessListener(new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void aVoid) {
+                        // Copy the fetched config values (if any) to the FirebaseRemoteConfig, thus
+                        // making these fetched config values available via FirebaseRemoteConfig
+                        // get<type> methods, e.g., getLong(), getString().
+                        mFirebaseRemoteConfig.activateFetched();
+
+                        // Update the EditText length limit with
+                        // the newly retrieved values from Remote Config.
+                        applyRetrievedLengthLimit();
+                    }
+                })
+
+                // If the fetch failed (for example, because the device is offline),
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        // An error occurred when fetching the config.
+                        Log.w(TAG, "Error fetching config", e);
+
+                        // Update the EditText length limit with
+                        // the newly retrieved values from Remote Config.
+                        applyRetrievedLengthLimit();
+                    }
+                });
+
+    }
+
+    /**
+     * Apply the retrieved length limit to EditText field. This result may be fresh from
+     * the server or it may be from cached values.
+     */
+    private void applyRetrievedLengthLimit() {
+        // Get whatever value is currently stored in the Firebase Remote Config. This could be a
+        // recently fetched value if the fetch was successful. If it wasn't, it could be whatever
+        // was cached as a result of a previous Remote Config operation.
+        Long friendly_msg_length =
+                mFirebaseRemoteConfig.getLong(FRIENDLY_MSG_LENGTH_KEY);
+
+        // Update the EditText's message length limit
+        mMessageEditText.setFilters(new InputFilter[]{new
+                InputFilter.LengthFilter(friendly_msg_length.intValue())});
+
+        Log.d(TAG, FRIENDLY_MSG_LENGTH_KEY + " = " + friendly_msg_length);
     }
 }
