@@ -43,20 +43,36 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.remoteconfig.FirebaseRemoteConfig;
+import com.google.firebase.remoteconfig.FirebaseRemoteConfigSettings;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
 
     public static final String ANONYMOUS = "anonymous";
+
+    /**
+     * The default limit that the app should use for message length.
+     * This can be modified by Remote Config.
+     */
     public static final int DEFAULT_MSG_LENGTH_LIMIT = 1000;
+
+    /**
+     * The key used for a parameter which can be changed via Remote Config. The literal value of
+     * this key must be "friendly_msg_length", since this is the name of the parameter key on the
+     * on the Firebase Console's Remote Config.
+     */
+    public static final String FRIENDLY_MSG_LENGTH_KEY = "friendly_msg_length";
 
     /**
      * An arbitrary request code to identify the request when the result is returned to the app
@@ -114,6 +130,9 @@ public class MainActivity extends AppCompatActivity {
      */
     private ChildEventListener mChildEventListener;
 
+    /** The entry point for all Firebase Remote Config actions. */
+    private FirebaseRemoteConfig mFirebaseRemoteConfig;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -137,6 +156,9 @@ public class MainActivity extends AppCompatActivity {
 
         // Get reference to a portion of the storage called "chat_photos"
         mChatPhotosStorageReference = mFirebaseStorage.getReference().child("chat_photos");
+
+        // Get an entry point to Firebase Remote Config actions
+        mFirebaseRemoteConfig = FirebaseRemoteConfig.getInstance();
 
         // Initialize references to views
         mProgressBar = (ProgressBar) findViewById(R.id.progressBar);
@@ -238,6 +260,22 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         };
+
+        // Create Remote Config Setting to enable developer mode.
+        // Fetching configs from the server is normally limited to 5 requests per
+        // hour. Enabling developer mode allows many more requests to be made per
+        // hour, so developers can test different config values during development.
+        FirebaseRemoteConfigSettings configSettings = new FirebaseRemoteConfigSettings.Builder()
+                .setDeveloperModeEnabled(BuildConfig.DEBUG)
+                .build();
+        mFirebaseRemoteConfig.setConfigSettings(configSettings);
+
+        // Create a map of parameter keys for default values. These default config values are
+        // what will be used by the app, unless they are changed via the Remote Config service
+        // in the Firebase Console
+        Map<String, Object> defaultConfigMap = new HashMap<>();
+        defaultConfigMap.put(FRIENDLY_MSG_LENGTH_KEY, DEFAULT_MSG_LENGTH_LIMIT);
+        mFirebaseRemoteConfig.setDefaults(defaultConfigMap);
     }
 
     @Override

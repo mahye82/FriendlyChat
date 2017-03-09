@@ -61,5 +61,8 @@ dependencies {
 
     // Firebase Cloud Messaging & Notifications
     compile 'com.google.firebase:firebase-messaging:10.2.0'
+
+    // Firebase Remote Config
+    compile 'com.google.firebase:firebase-config:10.2.0'
 }
 apply plugin: 'com.google.gms.google-services'
